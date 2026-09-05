@@ -8,7 +8,7 @@
 // white screen.
 // ============================================================================
 
-export type AIProviderName = "openai" | "anthropic" | "gemini" | "demo";
+export type AIProviderName = "openai" | "anthropic" | "gemini" | "groq" | "demo";
 
 function readBool(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
@@ -41,6 +41,10 @@ export const env = {
       apiKey: process.env.GEMINI_API_KEY ?? "",
       model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
     },
+    groq: {
+      apiKey: process.env.GROQ_API_KEY ?? "",
+      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+    },
   },
   app: {
     url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
@@ -57,6 +61,7 @@ export function isAIConfigured(): boolean {
   if (provider === "openai") return Boolean(env.ai.openai.apiKey);
   if (provider === "anthropic") return Boolean(env.ai.anthropic.apiKey);
   if (provider === "gemini") return Boolean(env.ai.gemini.apiKey);
+  if (provider === "groq") return Boolean(env.ai.groq.apiKey);
   return false; // demo provider is "configured" by definition but callers treat it distinctly
 }
 
