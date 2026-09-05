@@ -4,6 +4,7 @@ import { DemoProvider } from "@/lib/ai/providers/demo";
 import { OpenAIProvider } from "@/lib/ai/providers/openai";
 import { AnthropicProvider } from "@/lib/ai/providers/anthropic";
 import { GeminiProvider } from "@/lib/ai/providers/gemini";
+import { GroqProvider } from "@/lib/ai/providers/groq";
 import { detectImminentRisk, SELF_HARM_CRISIS_RESPONSE } from "@/lib/ai/prompts";
 
 const demo = new DemoProvider();
@@ -22,6 +23,8 @@ export function getAIProvider(): AIProvider {
       return new AnthropicProvider();
     case "gemini":
       return new GeminiProvider();
+    case "groq":
+      return new GroqProvider();
     default:
       return demo;
   }
