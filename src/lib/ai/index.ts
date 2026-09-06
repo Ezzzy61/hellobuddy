@@ -22,11 +22,11 @@ function buildFreeProviderChain(): AIProvider[] {
 
   if (env.ai.groq.apiKey) {
     chain.push(new GroqProvider()); // primary Groq model
-    if (env.ai.groq.secondaryModel) {
-      // A second model on the SAME Groq account has its own independent
-      // daily quota, so it acts as extra headroom once the primary model's
-      // quota is exhausted for the day.
-      chain.push(new GroqProvider(env.ai.groq.secondaryModel));
+    // Every extra model on the SAME Groq account has its own independent
+    // daily quota, so each one is extra headroom once the previous model's
+    // quota is exhausted for the day — same key, no extra signup.
+    for (const model of env.ai.groq.extraModels) {
+      chain.push(new GroqProvider(model));
     }
   }
   if (env.ai.gemini.apiKey) {
