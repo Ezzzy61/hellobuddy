@@ -6,7 +6,8 @@ import { buildConfusedModePrompt } from "@/lib/ai/prompts";
 import { safeChat } from "@/lib/ai";
 import { getUsageStatus, incrementUsage } from "@/lib/usage";
 import { trackEvent } from "@/lib/analytics";
-import { maybeExtractMemories } from "@/lib/ai/memory-extraction";
+// Memory extraction is currently disabled (see call site below) to save Groq request quota.
+// import { maybeExtractMemories } from "@/lib/ai/memory-extraction";
 import type { ConversationMode } from "@/types/database";
 
 const bodySchema = z.object({
@@ -95,10 +96,12 @@ export async function POST(request: Request) {
     await incrementUsage(supabase, user.id);
   }
 
-  // Non-blocking-ish best-effort memory suggestion (never breaks chat response on failure).
-  maybeExtractMemories(supabase, user.id, message).catch((err) =>
-    console.error("[chat] memory extraction failed", err)
-  );
+  // Memory extraction disabled: it fired a second AI call per qualifying message,
+  // roughly doubling Groq request usage against our free-tier daily quota.
+  // Re-enable by uncommenting once we have more headroom (paid tier or additional providers).
+  // maybeExtractMemories(supabase, user.id, message).catch((err) =>
+  //   console.error("[chat] memory extraction failed", err)
+  // );
 
   if (isFirstMessageInConversation) {
     await trackEvent(supabase, user.id, "first_conversation", { mode });
