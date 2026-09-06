@@ -44,6 +44,29 @@ export const env = {
     groq: {
       apiKey: process.env.GROQ_API_KEY ?? "",
       model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      // A second, independently-quota'd free model on the same Groq account.
+      // Used as a fallback once the primary model's daily quota is exhausted.
+      secondaryModel: process.env.GROQ_MODEL_SECONDARY || "",
+    },
+    // OpenRouter: aggregates many providers' "<model>:free" variants behind one
+    // OpenAI-compatible API. No card required to use free models; exceeding the
+    // free quota just returns a 429, never a charge.
+    openrouter: {
+      apiKey: process.env.OPENROUTER_API_KEY ?? "",
+      model: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free",
+    },
+    // SambaNova Cloud: free tier applies automatically as long as no payment
+    // method is linked to the account — small quota (~20/day) but stacks.
+    sambanova: {
+      apiKey: process.env.SAMBANOVA_API_KEY ?? "",
+      model: process.env.SAMBANOVA_MODEL || "Meta-Llama-3.3-70B-Instruct",
+    },
+    // Cloudflare Workers AI: 10,000 free "neurons"/day on any free Cloudflare
+    // account, no card. Good for roughly 15-25 short chat replies/day.
+    cloudflare: {
+      accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+      apiToken: process.env.CLOUDFLARE_API_TOKEN ?? "",
+      model: process.env.CLOUDFLARE_MODEL || "@cf/meta/llama-3.1-8b-instruct",
     },
   },
   app: {
