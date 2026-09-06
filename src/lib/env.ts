@@ -87,6 +87,10 @@ export const env = {
   },
   usage: {
     freeDailyMessageLimit: Number(process.env.FREE_PLAN_DAILY_MESSAGE_LIMIT || 30),
+    // Beta launch cap: stop accepting new signups once this many profiles
+    // exist, so you can see how the app holds up with a known user count
+    // before opening it wider. Checked by /api/signup-gate.
+    signupCap: Number(process.env.SIGNUP_CAP || 102),
   },
 };
 
