@@ -11,64 +11,51 @@ import type {
 import { MEMORY_EXTRACTION_INSTRUCTIONS } from "@/lib/ai/prompts";
 import { safeParseJsonArray } from "@/lib/ai/json-utils";
 
-// Groq's API is OpenAI-compatible (same /chat/completions request/response
-// shape), just a different base URL, model names, and a much more generous
-// free tier (no credit card, no billing account possible — requests are
-// simply rejected with an error once the daily/per-minute quota is hit).
-const API_URL = "https://api.groq.com/openai/v1/chat/completions";
+// Cloudflare Workers AI: 10,000 free "neurons"/day on any free Cloudflare
+// account (no card, no waitlist). Not OpenAI-shaped — its own tiny REST API.
+// Good for roughly 15-25 short chat replies/day, so it's the last resort
+// before demo mode rather than a primary provider.
+function apiUrl(model: string) {
+  return `https://api.cloudflare.com/client/v4/accounts/${env.ai.cloudflare.accountId}/ai/run/${model}`;
+}
 
-async function callGroq(
-  model: string,
+async function callCloudflare(
   messages: { role: string; content: string }[],
-  options?: { temperature?: number; maxTokens?: number; jsonMode?: boolean }
+  options?: { maxTokens?: number }
 ): Promise<string> {
-  const res = await fetch(API_URL, {
+  const res = await fetch(apiUrl(env.ai.cloudflare.model), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.ai.groq.apiKey}`,
+      Authorization: `Bearer ${env.ai.cloudflare.apiToken}`,
     },
     body: JSON.stringify({
-      model,
       messages,
-      temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 500,
-      ...(options?.jsonMode ? { response_format: { type: "json_object" } } : {}),
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Groq request failed (${res.status}): ${errText}`);
+    throw new Error(`Cloudflare Workers AI request failed (${res.status}): ${errText}`);
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
+  if (data.success === false) {
+    throw new Error(`Cloudflare Workers AI error: ${JSON.stringify(data.errors ?? data)}`);
+  }
+  return data.result?.response ?? "";
 }
 
-export class GroqProvider implements AIProvider {
-  readonly name: string;
-  private readonly model: string;
-
-  /**
-   * Optionally pass a different model than the configured default so a
-   * second GroqProvider instance can act as a fallback with its own,
-   * independent daily quota (e.g. GROQ_MODEL_SECONDARY).
-   */
-  constructor(modelOverride?: string) {
-    this.model = modelOverride || env.ai.groq.model;
-    this.name = modelOverride ? `groq:${modelOverride}` : "groq";
-  }
+export class CloudflareProvider implements AIProvider {
+  readonly name = "cloudflare";
 
   async chat(options: ChatOptions): Promise<ChatResult> {
     const messages = [
       { role: "system", content: options.systemPrompt },
       ...options.messages.map((m) => ({ role: m.role, content: m.content })),
     ];
-    const content = await callGroq(this.model, messages, {
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-    });
+    const content = await callCloudflare(messages, { maxTokens: options.maxTokens });
     return { content, isDemo: false };
   }
 
@@ -80,7 +67,7 @@ export class GroqProvider implements AIProvider {
       },
       { role: "user", content: options.text },
     ];
-    return callGroq(this.model, messages, { maxTokens: 300 });
+    return callCloudflare(messages, { maxTokens: 300 });
   }
 
   async extractMemories(options: ExtractMemoriesOptions): Promise<ExtractedMemory[]> {
@@ -91,7 +78,7 @@ export class GroqProvider implements AIProvider {
         content: `Existing memories (avoid duplicates):\n${(options.existingMemories ?? []).join("\n") || "(none)"}\n\nText to analyze:\n${options.text}\n\nRespond ONLY with a JSON object: { "memories": [{ "category": "...", "content": "...", "sourceExcerpt": "..." }] }`,
       },
     ];
-    const raw = await callGroq(this.model, messages, { maxTokens: 600, jsonMode: true });
+    const raw = await callCloudflare(messages, { maxTokens: 600 });
     return safeParseJsonArray(raw);
   }
 
@@ -100,6 +87,6 @@ export class GroqProvider implements AIProvider {
       { role: "system", content: options.instructions },
       { role: "user", content: options.context },
     ];
-    return callGroq(this.model, messages, { maxTokens: 500 });
+    return callCloudflare(messages, { maxTokens: 500 });
   }
 }

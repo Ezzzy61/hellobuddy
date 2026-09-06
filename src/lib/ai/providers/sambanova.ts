@@ -11,14 +11,12 @@ import type {
 import { MEMORY_EXTRACTION_INSTRUCTIONS } from "@/lib/ai/prompts";
 import { safeParseJsonArray } from "@/lib/ai/json-utils";
 
-// Groq's API is OpenAI-compatible (same /chat/completions request/response
-// shape), just a different base URL, model names, and a much more generous
-// free tier (no credit card, no billing account possible — requests are
-// simply rejected with an error once the daily/per-minute quota is hit).
-const API_URL = "https://api.groq.com/openai/v1/chat/completions";
+// SambaNova Cloud is OpenAI-compatible. Its free tier applies automatically
+// whenever no payment method is linked to the account (no card = no billing
+// risk, ever) — just a small daily quota.
+const API_URL = "https://api.sambanova.ai/v1/chat/completions";
 
-async function callGroq(
-  model: string,
+async function callSambaNova(
   messages: { role: string; content: string }[],
   options?: { temperature?: number; maxTokens?: number; jsonMode?: boolean }
 ): Promise<string> {
@@ -26,10 +24,10 @@ async function callGroq(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.ai.groq.apiKey}`,
+      Authorization: `Bearer ${env.ai.sambanova.apiKey}`,
     },
     body: JSON.stringify({
-      model,
+      model: env.ai.sambanova.model,
       messages,
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens ?? 500,
@@ -39,33 +37,22 @@ async function callGroq(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Groq request failed (${res.status}): ${errText}`);
+    throw new Error(`SambaNova request failed (${res.status}): ${errText}`);
   }
 
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-export class GroqProvider implements AIProvider {
-  readonly name: string;
-  private readonly model: string;
-
-  /**
-   * Optionally pass a different model than the configured default so a
-   * second GroqProvider instance can act as a fallback with its own,
-   * independent daily quota (e.g. GROQ_MODEL_SECONDARY).
-   */
-  constructor(modelOverride?: string) {
-    this.model = modelOverride || env.ai.groq.model;
-    this.name = modelOverride ? `groq:${modelOverride}` : "groq";
-  }
+export class SambaNovaProvider implements AIProvider {
+  readonly name = "sambanova";
 
   async chat(options: ChatOptions): Promise<ChatResult> {
     const messages = [
       { role: "system", content: options.systemPrompt },
       ...options.messages.map((m) => ({ role: m.role, content: m.content })),
     ];
-    const content = await callGroq(this.model, messages, {
+    const content = await callSambaNova(messages, {
       temperature: options.temperature,
       maxTokens: options.maxTokens,
     });
@@ -80,7 +67,7 @@ export class GroqProvider implements AIProvider {
       },
       { role: "user", content: options.text },
     ];
-    return callGroq(this.model, messages, { maxTokens: 300 });
+    return callSambaNova(messages, { maxTokens: 300 });
   }
 
   async extractMemories(options: ExtractMemoriesOptions): Promise<ExtractedMemory[]> {
@@ -91,7 +78,7 @@ export class GroqProvider implements AIProvider {
         content: `Existing memories (avoid duplicates):\n${(options.existingMemories ?? []).join("\n") || "(none)"}\n\nText to analyze:\n${options.text}\n\nRespond ONLY with a JSON object: { "memories": [{ "category": "...", "content": "...", "sourceExcerpt": "..." }] }`,
       },
     ];
-    const raw = await callGroq(this.model, messages, { maxTokens: 600, jsonMode: true });
+    const raw = await callSambaNova(messages, { maxTokens: 600, jsonMode: true });
     return safeParseJsonArray(raw);
   }
 
@@ -100,6 +87,6 @@ export class GroqProvider implements AIProvider {
       { role: "system", content: options.instructions },
       { role: "user", content: options.context },
     ];
-    return callGroq(this.model, messages, { maxTokens: 500 });
+    return callSambaNova(messages, { maxTokens: 500 });
   }
 }
