@@ -20,8 +20,29 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
+  const [signupsFull, setSignupsFull] = React.useState(false);
+  const [checkingGate, setCheckingGate] = React.useState(mode === "signup");
 
   const supabaseReady = env.supabase.isConfigured;
+
+  React.useEffect(() => {
+    if (mode !== "signup") return;
+    let cancelled = false;
+    fetch("/api/signup-gate")
+      .then((res) => res.json())
+      .then((data: { open: boolean }) => {
+        if (!cancelled) setSignupsFull(!data.open);
+      })
+      .catch(() => {
+        // Fail open on a network hiccup — don't block signups over this.
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingGate(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +50,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     setMessage(null);
     if (!supabaseReady) {
       setError("Supabase is not configured yet. Add your Supabase URL and anon key to .env.local.");
+      return;
+    }
+    if (mode === "signup" && signupsFull) {
+      setError("We've reached our beta limit for now. Please check back soon — thanks for your patience!");
       return;
     }
     setLoading(true);
@@ -58,6 +83,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   async function handleGoogle() {
     if (!supabaseReady) {
       setError("Supabase is not configured yet.");
+      return;
+    }
+    if (mode === "signup" && signupsFull) {
+      setError("We've reached our beta limit for now. Please check back soon — thanks for your patience!");
       return;
     }
     setGoogleLoading(true);
@@ -92,6 +121,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </Alert>
       )}
 
+      {mode === "signup" && signupsFull && !checkingGate && (
+        <Alert variant="warning" title="Beta is full for now" className="mb-5">
+          We've reached our first-100 beta limit while we see how things go. Check back soon —
+          we'll open more spots shortly.
+        </Alert>
+      )}
+
       {error && (
         <Alert variant="error" className="mb-5">
           {error}
@@ -110,7 +146,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             variant="outline"
             className="w-full mb-4"
             onClick={handleGoogle}
-            disabled={googleLoading}
+            disabled={googleLoading || checkingGate || (mode === "signup" && signupsFull)}
           >
             {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Continue with Google
@@ -153,8 +189,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={loading || checkingGate || (mode === "signup" && signupsFull)}
+        >
+          {(loading || checkingGate) && <Loader2 className="h-4 w-4 animate-spin" />}
           {mode === "login" ? "Log in" : "Create account"}
         </Button>
       </form>
