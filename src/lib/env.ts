@@ -44,9 +44,21 @@ export const env = {
     groq: {
       apiKey: process.env.GROQ_API_KEY ?? "",
       model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-      // A second, independently-quota'd free model on the same Groq account.
-      // Used as a fallback once the primary model's daily quota is exhausted.
-      secondaryModel: process.env.GROQ_MODEL_SECONDARY || "",
+      // Every model on a Groq account gets its OWN independent daily quota.
+      // These extra models are tried in order, after the primary model above,
+      // once its quota is exhausted for the day — same API key, zero extra
+      // signup. Ordered best-quality-first; allam-2-7b is last because it's
+      // an Arabic/English bilingual model (untested for this app's English
+      // coaching tone) but carries a much larger 7,000/day quota, so it's a
+      // good overflow tier rather than a primary choice.
+      // Override with a comma-separated GROQ_EXTRA_MODELS env var if needed.
+      extraModels: (
+        process.env.GROQ_EXTRA_MODELS ||
+        "openai/gpt-oss-120b,qwen/qwen3.6-27b,qwen/qwen3.8-27b,allam-2-7b"
+      )
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean),
     },
     // OpenRouter: aggregates many providers' "<model>:free" variants behind one
     // OpenAI-compatible API. No card required to use free models; exceeding the
