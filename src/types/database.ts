@@ -53,6 +53,8 @@ export interface Profile {
   life_area_ratings: LifeAreaRatings;
   plan: Plan;
   timezone: string | null;
+  /** ISO 3166-1 alpha-2 country code (e.g. "IN", "US"), used to tailor crisis-support resources. */
+  country: string | null;
   safety_disclaimer_ack: boolean;
   demo_mode: boolean;
   created_at: string;
