@@ -74,7 +74,9 @@ export async function POST(request: Request) {
     queryText: message,
     communicationStyle: profile.communication_style,
     preferredName: profile.preferred_name,
-    extraInstructions: mode === "confused" ? buildConfusedModePrompt(profile.communication_style) : undefined,
+    countryCode: profile.country,
+    extraInstructions:
+      mode === "confused" ? buildConfusedModePrompt(profile.communication_style, profile.country) : undefined,
   });
 
   const chatMessages = [
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
     { role: "user" as const, content: message },
   ];
 
-  const result = await safeChat({ systemPrompt, messages: chatMessages });
+  const result = await safeChat({ systemPrompt, messages: chatMessages, country: profile.country });
 
   await supabase.from("messages").insert({
     conversation_id: activeConversationId,
