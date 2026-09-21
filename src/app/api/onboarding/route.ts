@@ -17,6 +17,7 @@ const lifeAreaSchema = z
 
 const bodySchema = z.object({
   preferredName: z.string().trim().min(1).max(60),
+  country: z.string().trim().max(2).optional(),
   currentLifeContext: z.string().trim().max(2000).optional(),
   currentPriorities: z.string().trim().max(2000).optional(),
   shortTermGoal: z.string().trim().max(500).optional(),
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     .from("profiles")
     .update({
       preferred_name: body.preferredName,
+      country: body.country || null,
       current_life_context: body.currentLifeContext || null,
       current_priorities: body.currentPriorities || null,
       life_area_ratings: body.lifeAreaRatings || {},
