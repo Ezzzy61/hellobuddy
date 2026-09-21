@@ -17,6 +17,8 @@ export interface ChatOptions {
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** ISO 3166-1 alpha-2 country code, used only by safeChat's crisis short-circuit to pick locally relevant resources. Providers ignore this field. */
+  country?: string | null;
 }
 
 export interface ChatResult {

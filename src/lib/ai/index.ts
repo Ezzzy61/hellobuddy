@@ -8,7 +8,7 @@ import { GroqProvider } from "@/lib/ai/providers/groq";
 import { OpenRouterProvider } from "@/lib/ai/providers/openrouter";
 import { SambaNovaProvider } from "@/lib/ai/providers/sambanova";
 import { CloudflareProvider } from "@/lib/ai/providers/cloudflare";
-import { detectImminentRisk, SELF_HARM_CRISIS_RESPONSE } from "@/lib/ai/prompts";
+import { detectImminentRisk, buildCrisisResponse } from "@/lib/ai/prompts";
 
 const demo = new DemoProvider();
 
@@ -60,7 +60,7 @@ export function getAIProvider(): AIProvider {
 export async function safeChat(options: ChatOptions): Promise<ChatResult & { isCrisis?: boolean }> {
   const lastUserMessage = [...options.messages].reverse().find((m) => m.role === "user");
   if (lastUserMessage && detectImminentRisk(lastUserMessage.content)) {
-    return { content: SELF_HARM_CRISIS_RESPONSE, isDemo: false, isCrisis: true };
+    return { content: buildCrisisResponse(options.country), isDemo: false, isCrisis: true };
   }
 
   if (env.ai.provider === "demo") {

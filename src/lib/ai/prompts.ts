@@ -1,19 +1,35 @@
 import type { CommunicationStyle } from "@/types/database";
+import { getCrisisResources } from "@/lib/crisis-resources";
 
 // ============================================================================
 // Prompt construction. Centralized so tone/safety rules stay consistent
 // everywhere the AI is called (Talk, Confused mode, journal reflections).
 // ============================================================================
 
-export const SAFETY_RULES = `
+/**
+ * Safety rules, parameterized by the user's country so the AI's own
+ * crisis-handling instructions point to locally relevant emergency numbers
+ * instead of defaulting to US examples for everyone. This is defense in
+ * depth alongside the regex tripwire in detectImminentRisk() below — if a
+ * message slips past the tripwire, the model itself still has the right
+ * numbers to reach for.
+ */
+export function buildSafetyRules(countryCode?: string | null): string {
+  const resources = getCrisisResources(countryCode);
+  const resourceLine = resources.lines.join("; ");
+  return `
 Safety rules (never break these):
 - You are HelloBuddy, a personal reflection and growth companion. You are NOT a therapist, doctor, or emergency service, and you must never claim to be one.
 - Never diagnose a mental health condition. Never claim certainty about another person's intentions, feelings, or character.
 - Use humble, non-absolute language: "Based on what you've shared...", "One possible pattern is...", "Does this feel accurate to you?", "I may be missing context..."
 - Never shame, insult, or manipulate the user. Challenge gently and constructively, never cruelly.
 - Never encourage the user to depend on you instead of real relationships or professional help when appropriate.
-- If the user expresses immediate danger, active suicidal intent, or imminent self-harm, STOP normal coaching immediately. Respond with warmth, take it seriously, and clearly encourage them to contact local emergency services (e.g. 911 in the US, or their local emergency number) or a trusted person right now. Mention that HelloBuddy is not equipped to provide emergency support. Do not try to "fix" the crisis yourself.
+- If the user expresses immediate danger, active suicidal intent, or imminent self-harm, STOP normal coaching immediately. Respond with warmth, take it seriously, and clearly encourage them to contact local emergency services or a trusted person right now. The user is in ${resources.countryName} — use these resources rather than defaulting to US-only numbers: ${resourceLine}. Mention that HelloBuddy is not equipped to provide emergency support. Do not try to "fix" the crisis yourself.
 `.trim();
+}
+
+/** @deprecated Use buildSafetyRules(countryCode) so crisis numbers match the user's country. Kept only for any stray references. */
+export const SAFETY_RULES = buildSafetyRules(undefined);
 
 const STYLE_GUIDANCE: Record<CommunicationStyle, string> = {
   gentle:
@@ -24,7 +40,11 @@ const STYLE_GUIDANCE: Record<CommunicationStyle, string> = {
     "Communication style: PUSH ME. The user has asked to be challenged. Constructively question excuses and inconsistencies, hold them to their own stated goals, and push for concrete commitments — but never insult, humiliate, or shame them.",
 };
 
-export function buildPersonaPrompt(style: CommunicationStyle, preferredName?: string | null): string {
+export function buildPersonaPrompt(
+  style: CommunicationStyle,
+  preferredName?: string | null,
+  countryCode?: string | null
+): string {
   const name = preferredName?.trim();
   return `
 You are Buddy, the voice of HelloBuddy — "your biggest supporter, your honest mirror."
@@ -44,11 +64,11 @@ Honest Mirror behavior:
 - Frame every observation as a possibility, not a verdict: "One possible pattern is...", "I might be missing context, but...".
 - Always end a challenge with an open, curious question back to the user rather than a lecture.
 
-${SAFETY_RULES}
+${buildSafetyRules(countryCode)}
 `.trim();
 }
 
-export function buildConfusedModePrompt(style: CommunicationStyle): string {
+export function buildConfusedModePrompt(style: CommunicationStyle, countryCode?: string | null): string {
   return `
 You are Buddy, guiding the user through HelloBuddy's structured "I'm Confused" reflection workflow.
 Your job in this mode is to help the user think clearly, not to give them the answer.
@@ -63,7 +83,7 @@ When asked to produce the final synthesis, structure it with these exact section
 "Honest Reflection", "Facts vs Assumptions", "What Seems Important", "Possible Options", "A Small Next Step".
 Use humble, non-absolute language throughout ("Based on what you've shared...").
 
-${SAFETY_RULES}
+${buildSafetyRules(countryCode)}
 `.trim();
 }
 
@@ -81,22 +101,40 @@ Rules:
 - Return between 0 and 6 memories. If nothing meaningful is present, return an empty list.
 `.trim();
 
-export const SELF_HARM_CRISIS_RESPONSE = `I'm really glad you told me this, and I want to take it seriously.
+/**
+ * Builds the fixed (non-AI-generated) crisis response, tailored to the
+ * user's country when known. This bypasses the language model entirely —
+ * see detectImminentRisk() below and its call site in safeChat() — so the
+ * wording here is exactly what a user in crisis sees, with no AI variance.
+ */
+export function buildCrisisResponse(countryCode?: string | null): string {
+  const resources = getCrisisResources(countryCode);
+  const resourceLines = resources.lines.map((line) => `- ${line}`).join("\n");
+  return `I'm really glad you told me this, and I want to take it seriously.
 
-I'm not able to provide emergency or crisis support — HelloBuddy is a reflection tool, not a substitute for real help in a moment like this. If you are in immediate danger, please contact your local emergency number right now (for example, 911 in the US), or reach out to a crisis line if you're able to — in the US you can call or text 988. If there's someone you trust nearby — a friend, family member, or neighbor — please also consider reaching out to them right now.
+I'm not able to provide emergency or crisis support — HelloBuddy is a reflection tool, not a substitute for real help in a moment like this. If you are in immediate danger, please reach out right now:
+
+${resourceLines}
+
+If there's someone you trust nearby — a friend, family member, or neighbor — please also consider reaching out to them right now.
 
 You don't have to go through this moment alone. Is there someone you can contact right now?`;
+}
+
+/** @deprecated Use buildCrisisResponse(countryCode) so the numbers shown match the user's country. Kept only for any stray references. */
+export const SELF_HARM_CRISIS_RESPONSE = buildCrisisResponse(undefined);
 
 const SELF_HARM_PATTERNS: RegExp[] = [
-  /\bkill myself\b/i,
+  /\bkill(ing)? myself\b/i,
   /\bsuicid(e|al)\b/i,
-  /\bend my life\b/i,
-  /\bwant to die\b/i,
-  /\bdon'?t want to (be alive|live anymore)\b/i,
+  /\bend(ing)? my life\b/i,
+  /\bwant(ed)? to die\b/i,
+  /\bdon'?t want to (be alive|live anymore|exist)\b/i,
   /\bhurt(ing)? myself\b/i,
-  /\bself[- ]harm\b/i,
+  /\bself[- ]harm(ing)?\b/i,
   /\bno reason to live\b/i,
-  /\bplan to (kill|hurt) myself\b/i,
+  /\bplan(ning)? to (kill|hurt) myself\b/i,
+  /\bbetter off (dead|without me)\b/i,
 ];
 
 /** Very lightweight heuristic safety check. Not a clinical tool — a conservative tripwire that always defers to the crisis response over normal coaching when in doubt. */

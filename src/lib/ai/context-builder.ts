@@ -59,11 +59,14 @@ interface BuildContextParams {
   queryText: string;
   communicationStyle: CommunicationStyle;
   preferredName?: string | null;
+  /** ISO 3166-1 alpha-2 country code — passed through to the safety rules so crisis guidance shows locally relevant numbers. */
+  countryCode?: string | null;
   extraInstructions?: string;
 }
 
 export async function buildTalkContext(params: BuildContextParams): Promise<BuiltContext> {
-  const { supabase, userId, conversationId, queryText, communicationStyle, preferredName, extraInstructions } = params;
+  const { supabase, userId, conversationId, queryText, communicationStyle, preferredName, countryCode, extraInstructions } =
+    params;
 
   const [memoriesRes, goalsRes, journalRes, messagesRes] = await Promise.all([
     supabase
@@ -136,7 +139,7 @@ export async function buildTalkContext(params: BuildContextParams): Promise<Buil
         .join("\n")
     : "(no relevant journal entries)";
 
-  const persona = buildPersonaPrompt(communicationStyle, preferredName);
+  const persona = buildPersonaPrompt(communicationStyle, preferredName, countryCode);
 
   const systemPrompt = `${persona}
 
