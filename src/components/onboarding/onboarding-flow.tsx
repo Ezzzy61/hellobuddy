@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { COUNTRY_OPTIONS } from "@/lib/crisis-resources";
 import type { CommunicationStyle } from "@/types/database";
 
 const LIFE_AREAS: { key: string; label: string }[] = [
@@ -36,6 +37,7 @@ export function OnboardingFlow() {
   const [error, setError] = React.useState<string | null>(null);
 
   const [preferredName, setPreferredName] = React.useState("");
+  const [country, setCountry] = React.useState("");
   const [currentLifeContext, setCurrentLifeContext] = React.useState("");
   const [currentPriorities, setCurrentPriorities] = React.useState("");
   const [shortTermGoal, setShortTermGoal] = React.useState("");
@@ -60,6 +62,7 @@ export function OnboardingFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           preferredName: preferredName || "Friend",
+          country: country || undefined,
           currentLifeContext,
           currentPriorities,
           shortTermGoal,
@@ -115,6 +118,26 @@ export function OnboardingFlow() {
               onChange={(e) => setPreferredName(e.target.value)}
               placeholder="Your preferred name or nickname"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="country">Which country are you in?</Label>
+            <select
+              id="country"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-clay-400 focus:outline-none"
+            >
+              <option value="">Select a country</option>
+              {COUNTRY_OPTIONS.map((c) => (
+                <option key={c.code || "other"} value={c.code}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-ink-400">
+              This is only used to show the right local emergency numbers and helplines if you're ever
+              going through something serious — never for anything else.
+            </p>
           </div>
         </Step>
       )}
