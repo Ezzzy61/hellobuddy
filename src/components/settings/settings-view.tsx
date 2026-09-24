@@ -1,4 +1,4 @@
-——"use client";
+"use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { COUNTRY_OPTIONS } from "@/lib/crisis-resources";
 import type { CommunicationStyle, Profile } from "@/types/database";
 import Link from "next/link";
 
@@ -25,6 +26,7 @@ const STYLES: { key: CommunicationStyle; title: string; description: string }[] 
 export function SettingsView({ profile, email }: { profile: Profile; email: string | null }) {
   const [preferredName, setPreferredName] = React.useState(profile.preferred_name ?? "");
   const [style, setStyle] = React.useState<CommunicationStyle>(profile.communication_style);
+  const [country, setCountry] = React.useState(profile.country ?? "");
   const [saving, setSaving] = React.useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -35,7 +37,7 @@ export function SettingsView({ profile, email }: { profile: Profile; email: stri
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preferredName, communicationStyle: style }),
+        body: JSON.stringify({ preferredName, communicationStyle: style, country }),
       });
       if (!res.ok) throw new Error();
       toast("Settings saved.");
@@ -68,6 +70,26 @@ export function SettingsView({ profile, email }: { profile: Profile; email: stri
             <div className="space-y-1.5">
               <Label htmlFor="name">Preferred name</Label>
               <Input id="name" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="country">Country</Label>
+              <select
+                id="country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-clay-400 focus:outline-none"
+              >
+                <option value="">Select a country</option>
+                {COUNTRY_OPTIONS.map((c) => (
+                  <option key={c.code || "other"} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-ink-400">
+                Used only to show the right local emergency numbers and helplines if you're ever going
+                through something serious.
+              </p>
             </div>
           </CardContent>
         </Card>
